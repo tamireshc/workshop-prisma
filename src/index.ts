@@ -1,131 +1,125 @@
-import { PrismaClient } from "@prisma/client";
-import express from "express";
+import { ApolloServer } from "apollo-server";
+import { DateTimeResolver } from "graphql-scalars";
+import { Context, context } from "./context";
+import { ApolloServerPluginLandingPageGraphQLPlayground } from "apollo-server-core";
+import { User } from "@prisma/client";
 
-const prisma = new PrismaClient();
-const app = express();
+const typeDefs = `
+type Query {
+  allUsers: [User!]!
+  postById(id: Int!): Post
+  feed(searchString: String, skip: Int, take: Int): [Post!]!
+  draftsByUser(id: Int!): [Post]
+}
 
-app.use(express.json());
+type Mutation {
+  signupUser(name: String, email: String!): User!
+  createDraft(title: String!, content: String, authorEmail: String): Post
+  incrementPostViewCount(id: Int!): Post
+  deletePost(id: Int!): Post
+}
 
-app.get("/users", async (req, res) => {
-  const result = await prisma.user.findMany()
-  res.status(200).json(result)
-});
+type User {
+  id: Int!
+  email: String!
+  name: String
+  posts: [Post!]!
+}
 
-app.post(`/signup`, async (req, res) => {
-  const { name, email } = req.body;
+type Post {
+  id: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  title: String!
+  content: String
+  published: Boolean!
+  viewCount: Int!
+  author: User
+}
 
-  const result = await prisma.user.create({
-    data: {
-      name, email
-    }
-  })
+scalar DateTime
+`;
 
-  res.json(result)
-});
-
-app.post(`/post`, async (req, res) => {
-  const { title, content, authorEmail } = req.body;
-
-  const author = await prisma.user.findUnique({
-    where: {
-      email: authorEmail,
-    }
-  })
-
-  const result = await prisma.post.create({
-    data: {
-      title,
-      content,
-      authorId: Number(author?.id)
-    }
-  })
-
-  res.json(result)
-});
-
-app.put("/post/:id/views", async (req, res) => {
-  const { id } = req.params;
-
-  const result = await prisma.post.update({
-    where: {
-      id: Number(id),
+const resolvers = {
+  Query: {
+    allUsers: (_parent: any, _args: any, context: Context) => {
+      return context.prisma.user.findMany({
+        include: {
+          post: true
+        }
+      })
     },
-    data: {
-      viewCount: {
-        increment: 1,
-      }
-    }
-  })
-
-  res.json(result)
-});
-
-app.put("/publish/:id", async (req, res) => {
-  const { id } = req.params;
-
-  const result = await prisma.post.update({
-    where: {
-      id: Number(id)
+    postById: (_parent: any, args: { id: number }, context: Context) => {
+      return context.prisma.post.findUnique({
+        where: {
+          id: args.id
+        }
+      })
     },
-    data: {
-      published: true,
-    }
-  })
-
-  res.json(result)
-});
-
-app.get("/user/:id/drafts", async (req, res) => {
-  const { id } = req.params;
-
-  const result = await prisma.post.findMany({
-    where: {
-      authorId: Number(id),
-      published: false,
-    }
-  })
-
-  res.json(result)
-});
-
-app.get(`/post/:id`, async (req, res) => {
-  const { id } = req.params;
-
-  const result = await prisma.post.findUnique({
-    where: {
-      id: Number(id)
-    }
-  })
-
-  res.json(result)
-});
-
-app.get("/feed", async (req, res) => {
-  const { searchString, skip, take } = req.query;
-
-  const result = await prisma.post.findMany({
-    where: {
-      OR: [
-        {
-          title: {
-            contains: searchString as string
-          },
-        },
-        {
-          content: {
-            contains: searchString as string
-          },
-        },
-      ],
-      published: true
+    feed: (
+      _parent: any,
+      args: {
+        searchString: string | undefined;
+        skip: number | undefined;
+        take: number | undefined;
+      },
+      context: Context
+    ) => {
+      // TODO
     },
-    skip: Number(skip) || undefined,
-    take: Number(take) || undefined,
-  })
+    draftsByUser: (_parent: any, args: { id: number }, context: Context) => {
+      // TODO
+    },
+  },
+  Mutation: {
+    signupUser: (
+      _parent: any,
+      args: { name: string | undefined; email: string },
+      context: Context
+    ) => {
+      // TODO
+    },
+    createDraft: (
+      _parent: any,
+      args: { title: string; content: string | undefined; authorEmail: string },
+      context: Context
+    ) => {
+      // TODO
+    },
+    incrementPostViewCount: (
+      _parent: any,
+      args: { id: number },
+      context: Context
+    ) => {
+      // TODO
+    },
+    deletePost: (_parent: any, args: { id: number }, context: Context) => {
+      // TODO
+    },
+  },
+  Post: {
+    author: (parent: any, _args: any, context: Context) => {
+      return null;
+    },
+  },
+  User: {
+    posts: (parent: User, _args: any, context: Context) => {
+      return context.prisma.post.findMany({
+        where: {
+          authorId: parent.id
+        }
+      })
+    },
+  },
+  DateTime: DateTimeResolver,
+};
 
-  res.json(result)
+const server = new ApolloServer({
+  typeDefs,
+  resolvers,
+  context,
+  plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
 });
-
-app.listen(3002, () =>
+server.listen({ port: 3002 }, () =>
   console.log(`🚀 Server ready at: http://localhost:3002`)
 );
