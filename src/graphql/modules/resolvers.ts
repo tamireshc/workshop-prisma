@@ -58,35 +58,55 @@ export default {
       args: { title: string; content: string | undefined; authorEmail: string },
       context: Context
     ) => {
-      // TODO
+
+      return context.prisma.post.create({
+        data: {
+          title: args.title,
+          content: args.content,
+          author: {
+            connect: {
+              email: args.authorEmail
+            }
+          }
+        }
+      })
     },
     incrementPostViewCount: (
       _parent,
       args: { id: number },
       context: Context
     ) => {
-      // TODO
+      return context.prisma.post.update({
+        where: { id: args.id },
+        data: {
+          viewCount: {
+            increment: 1
+          }
+        }
+      })
     },
     deletePost: (_parent, args: { id: number }, context: Context) => {
-      // TODO
+      return context.prisma.post.delete({
+        where: { id: args.id }
+      })
     },
   },
   Post: {
     author: (parent, _args, context: Context) => {
-      return null;
+      return context.prisma.user.findUnique({
+        where: { id: parent.authorId }
+      })
     },
   },
   User: {
     post: (parent, _args, context: Context) => {
       console.log(parent)
 
-
-      return []
-      // context.prisma.post.findUnique({
-      //   where: {
-      //     id: parent.id
-      //   }
-      // });
+      return context.prisma.post.findMany({
+        where: {
+          authorId: parent.id
+        }
+      });
     },
   },
   DateTime: DateTimeResolver,
